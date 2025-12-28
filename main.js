@@ -388,14 +388,28 @@ function registerIpcHandlers() {
         throw new Error("Invalid appointment start time");
       }
       const end = new Date(start.getTime() + totalMinutes * 60000);
-      const startIso = start.toISOString();
-      const endIso = end.toISOString();
+
+      // Normalize to a local date-time string (no timezone conversion),
+      // so DATE(start_time) in SQLite matches the date selected in UI.
+      const pad = (n) => String(n).padStart(2, "0");
+      const toLocalDateTime = (d) => {
+        const year = d.getFullYear();
+        const month = pad(d.getMonth() + 1);
+        const day = pad(d.getDate());
+        const hours = pad(d.getHours());
+        const minutes = pad(d.getMinutes());
+        const seconds = pad(d.getSeconds());
+        return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+      };
+
+      const startLocal = toLocalDateTime(start);
+      const endLocal = toLocalDateTime(end);
 
       const info = db
         .prepare(
           "INSERT INTO appointments (customer_id, customer_name, is_walk_in, start_time, end_time, status, notes) VALUES (?, ?, ?, ?, ?, 'Booked', ?)"
         )
-        .run(customerId, customerName, isWalkIn, startIso, endIso, null);
+        .run(customerId, customerName, isWalkIn, startLocal, endLocal, null);
 
       const appointmentId = info.lastInsertRowid;
       const insertItem = db.prepare(
@@ -418,8 +432,8 @@ function registerIpcHandlers() {
         customer_id: customerId,
         customer_name: customerName,
         is_walk_in: isWalkIn,
-        start_time: startIso,
-        end_time: endIso,
+        start_time: startLocal,
+        end_time: endLocal,
         status: "Booked",
       };
     });

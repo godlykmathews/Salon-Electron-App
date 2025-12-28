@@ -799,7 +799,8 @@ window.addEventListener("DOMContentLoaded", () => {
         customerId: selectedAppointmentCustomerId,
         customerName,
         isWalkIn: appointmentWalkin.checked,
-        startTime: new Date(startValue).toISOString(),
+        // Store the raw local date-time value; backend will normalize
+        startTime: startValue,
         items: [
           {
             serviceId,
