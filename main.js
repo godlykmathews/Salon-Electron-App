@@ -45,6 +45,11 @@ function setSetting(key, value) {
   ).run(key, value);
 }
 
+function parseNumber(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 function registerIpcHandlers() {
   // Auth
   ipcMain.handle("auth:hasPin", () => {
@@ -82,7 +87,7 @@ function registerIpcHandlers() {
   // Customers
   ipcMain.handle("customers:list", (_event, { search } = {}) => {
     let sql =
-      "SELECT id, name, phone, created_at FROM customers WHERE is_active = 1";
+      "SELECT id, name, phone, gender, date_of_birth, loyalty_points, birthday_reminder_enabled, anniversary_date, anniversary_reminder_enabled, created_at FROM customers WHERE is_active = 1";
     const params = [];
     if (search && search.trim()) {
       const term = `%${search.trim()}%`;
@@ -99,12 +104,37 @@ function registerIpcHandlers() {
     }
     const name = payload.name.trim();
     const phone = payload.phone ? String(payload.phone).trim() : null;
+    const gender = payload.gender ? String(payload.gender).trim() : null;
+    const dateOfBirth = payload.date_of_birth
+      ? String(payload.date_of_birth).trim()
+      : null;
+    const preferredStaffId = payload.preferred_staff_id || null;
+    const preferredServiceId = payload.preferred_service_id || null;
+    const birthdayReminder = payload.birthday_reminder_enabled ? 1 : 0;
+    const anniversaryDate = payload.anniversary_date
+      ? String(payload.anniversary_date).trim()
+      : null;
+    const anniversaryReminder = payload.anniversary_reminder_enabled ? 1 : 0;
 
     const info = db
-      .prepare("INSERT INTO customers (name, phone) VALUES (?, ?)")
-      .run(name, phone);
+      .prepare(
+        "INSERT INTO customers (name, phone, gender, date_of_birth, preferred_staff_id, preferred_service_id, birthday_reminder_enabled, anniversary_date, anniversary_reminder_enabled) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      )
+      .run(
+        name,
+        phone,
+        gender,
+        dateOfBirth,
+        preferredStaffId,
+        preferredServiceId,
+        birthdayReminder,
+        anniversaryDate,
+        anniversaryReminder
+      );
     return db
-      .prepare("SELECT id, name, phone, created_at FROM customers WHERE id = ?")
+      .prepare(
+        "SELECT id, name, phone, gender, date_of_birth, loyalty_points, birthday_reminder_enabled, anniversary_date, anniversary_reminder_enabled, created_at FROM customers WHERE id = ?"
+      )
       .get(info.lastInsertRowid);
   });
 
@@ -117,13 +147,35 @@ function registerIpcHandlers() {
       throw new Error("Customer name is required");
     }
     const phone = payload.phone ? String(payload.phone).trim() : null;
-    db.prepare("UPDATE customers SET name = ?, phone = ? WHERE id = ?").run(
+    const gender = payload.gender ? String(payload.gender).trim() : null;
+    const dateOfBirth = payload.date_of_birth
+      ? String(payload.date_of_birth).trim()
+      : null;
+    const preferredStaffId = payload.preferred_staff_id || null;
+    const preferredServiceId = payload.preferred_service_id || null;
+    const birthdayReminder = payload.birthday_reminder_enabled ? 1 : 0;
+    const anniversaryDate = payload.anniversary_date
+      ? String(payload.anniversary_date).trim()
+      : null;
+    const anniversaryReminder = payload.anniversary_reminder_enabled ? 1 : 0;
+    db.prepare(
+      "UPDATE customers SET name = ?, phone = ?, gender = ?, date_of_birth = ?, preferred_staff_id = ?, preferred_service_id = ?, birthday_reminder_enabled = ?, anniversary_date = ?, anniversary_reminder_enabled = ? WHERE id = ?"
+    ).run(
       name,
       phone,
+      gender,
+      dateOfBirth,
+      preferredStaffId,
+      preferredServiceId,
+      birthdayReminder,
+      anniversaryDate,
+      anniversaryReminder,
       payload.id
     );
     return db
-      .prepare("SELECT id, name, phone, created_at FROM customers WHERE id = ?")
+      .prepare(
+        "SELECT id, name, phone, gender, date_of_birth, loyalty_points, birthday_reminder_enabled, anniversary_date, anniversary_reminder_enabled, created_at FROM customers WHERE id = ?"
+      )
       .get(payload.id);
   });
 
@@ -148,7 +200,7 @@ function registerIpcHandlers() {
   ipcMain.handle("services:list", () => {
     return db
       .prepare(
-        "SELECT id, name, price, duration_minutes, is_active FROM services ORDER BY name ASC"
+        "SELECT id, name, price, duration_minutes, is_active FROM services WHERE is_active = 1 ORDER BY name ASC"
       )
       .all();
   });
@@ -156,14 +208,19 @@ function registerIpcHandlers() {
   ipcMain.handle("services:add", (_event, payload) => {
     const name = payload?.name?.trim();
     const price = Number(payload?.price);
-    const duration = Number(payload?.duration_minutes);
+    const rawDuration = payload?.duration_minutes;
+    const duration =
+      rawDuration === undefined || rawDuration === null || rawDuration === ""
+        ? 0
+        : Number(rawDuration);
     if (!name) {
       throw new Error("Service name is required");
     }
     if (!Number.isFinite(price) || price < 0) {
       throw new Error("Service price is invalid");
     }
-    if (!Number.isInteger(duration) || duration <= 0) {
+    // Duration is optional; treat missing/blank as 0 minutes
+    if (!Number.isFinite(duration) || duration < 0) {
       throw new Error("Service duration is invalid");
     }
     const info = db
@@ -184,14 +241,18 @@ function registerIpcHandlers() {
     }
     const name = payload?.name?.trim();
     const price = Number(payload?.price);
-    const duration = Number(payload?.duration_minutes);
+    const rawDuration = payload?.duration_minutes;
+    const duration =
+      rawDuration === undefined || rawDuration === null || rawDuration === ""
+        ? 0
+        : Number(rawDuration);
     if (!name) {
       throw new Error("Service name is required");
     }
     if (!Number.isFinite(price) || price < 0) {
       throw new Error("Service price is invalid");
     }
-    if (!Number.isInteger(duration) || duration <= 0) {
+    if (!Number.isFinite(duration) || duration < 0) {
       throw new Error("Service duration is invalid");
     }
     db.prepare(
@@ -216,7 +277,7 @@ function registerIpcHandlers() {
   ipcMain.handle("staff:list", () => {
     return db
       .prepare(
-        "SELECT id, name, role, is_active, created_at FROM staff ORDER BY name ASC"
+        "SELECT id, name, role, is_active, created_at FROM staff WHERE is_active = 1 ORDER BY name ASC"
       )
       .all();
   });
@@ -272,11 +333,147 @@ function registerIpcHandlers() {
     return true;
   });
 
+  // Appointments
+  ipcMain.handle("appointments:create", (_event, payload) => {
+    const customerId = payload?.customerId || null;
+    const customerName = payload?.customerName?.trim();
+    const isWalkIn = payload?.isWalkIn ? 1 : 0;
+    const startTime = payload?.startTime;
+    const items = Array.isArray(payload?.items) ? payload.items : [];
+
+    if (!customerName) {
+      throw new Error("Customer name is required for appointment");
+    }
+    if (!startTime) {
+      throw new Error("Start time is required");
+    }
+    if (!items.length) {
+      throw new Error("At least one service is required");
+    }
+
+    const tx = db.transaction(() => {
+      let totalMinutes = 0;
+      const normalizedItems = items.map((item) => {
+        const serviceName = item?.serviceName?.trim();
+        const rawDuration = item?.duration_minutes;
+        const duration =
+          rawDuration === undefined ||
+          rawDuration === null ||
+          rawDuration === ""
+            ? 0
+            : Number(rawDuration);
+        const staffId = item?.staffId || null;
+        const staffName = item?.staffName?.trim() || null;
+        const serviceId = item?.serviceId || null;
+        const price = parseNumber(item?.price, 0);
+        if (!serviceName) {
+          throw new Error("Service name is required");
+        }
+        if (!Number.isFinite(duration) || duration < 0) {
+          throw new Error("Invalid service duration");
+        }
+        totalMinutes += duration;
+        return {
+          serviceId,
+          serviceName,
+          staffId,
+          staffName,
+          duration,
+          price,
+        };
+      });
+
+      const start = new Date(startTime);
+      if (Number.isNaN(start.getTime())) {
+        throw new Error("Invalid appointment start time");
+      }
+      const end = new Date(start.getTime() + totalMinutes * 60000);
+      const startIso = start.toISOString();
+      const endIso = end.toISOString();
+
+      const info = db
+        .prepare(
+          "INSERT INTO appointments (customer_id, customer_name, is_walk_in, start_time, end_time, status, notes) VALUES (?, ?, ?, ?, ?, 'Booked', ?)"
+        )
+        .run(customerId, customerName, isWalkIn, startIso, endIso, null);
+
+      const appointmentId = info.lastInsertRowid;
+      const insertItem = db.prepare(
+        "INSERT INTO appointment_services (appointment_id, service_id, service_name, duration_minutes, staff_id, staff_name, price) VALUES (?, ?, ?, ?, ?, ?, ?)"
+      );
+      for (const it of normalizedItems) {
+        insertItem.run(
+          appointmentId,
+          it.serviceId,
+          it.serviceName,
+          it.duration,
+          it.staffId,
+          it.staffName,
+          it.price
+        );
+      }
+
+      return {
+        id: appointmentId,
+        customer_id: customerId,
+        customer_name: customerName,
+        is_walk_in: isWalkIn,
+        start_time: startIso,
+        end_time: endIso,
+        status: "Booked",
+      };
+    });
+
+    return tx();
+  });
+
+  ipcMain.handle(
+    "appointments:listByRange",
+    (_event, { from, to, staffId }) => {
+      if (!from || !to) {
+        throw new Error("From and to dates are required");
+      }
+      let sql =
+        "SELECT * FROM appointments WHERE DATE(start_time) BETWEEN ? AND ?";
+      const params = [from, to];
+      if (staffId) {
+        // Filter appointments where any service is assigned to given staff
+        sql +=
+          " AND id IN (SELECT DISTINCT appointment_id FROM appointment_services WHERE staff_id = ?)";
+        params.push(staffId);
+      }
+      sql += " ORDER BY start_time ASC";
+      return db.prepare(sql).all(...params);
+    }
+  );
+
+  ipcMain.handle("appointments:updateStatus", (_event, { id, status }) => {
+    if (!id) {
+      throw new Error("Appointment id is required");
+    }
+    const allowed = ["Booked", "In-Progress", "Completed", "Cancelled"];
+    if (!allowed.includes(status)) {
+      throw new Error("Invalid status");
+    }
+    db.prepare("UPDATE appointments SET status = ? WHERE id = ?").run(
+      status,
+      id
+    );
+    return db.prepare("SELECT * FROM appointments WHERE id = ?").get(id);
+  });
+
   // Billing
   ipcMain.handle("billing:createBill", (_event, payload) => {
     const customerId = payload?.customerId || null;
     const customerName = payload?.customerName?.trim();
     const items = Array.isArray(payload?.items) ? payload.items : [];
+    const gstRate = parseNumber(
+      payload?.gstRate,
+      parseNumber(getSetting("gst_rate"), 0)
+    );
+    const manualDiscount = parseNumber(payload?.discountAmount, 0);
+    const payments = Array.isArray(payload?.payments) ? payload.payments : [];
+    const loyaltyRedeemPoints = parseNumber(payload?.loyaltyRedeemPoints, 0);
     if (!customerName) {
       throw new Error("Customer name is required for billing");
     }
@@ -288,11 +485,17 @@ function registerIpcHandlers() {
 
     const tx = db.transaction(() => {
       // Calculate totals
-      let totalAmount = 0;
+      let subtotal = 0;
       const normalizedItems = items.map((item) => {
         const serviceName = item?.serviceName?.trim();
         const unitPrice = Number(item?.unitPrice);
-        const duration = Number(item?.duration_minutes);
+        const durationRaw = item?.duration_minutes;
+        const duration =
+          durationRaw === undefined ||
+          durationRaw === null ||
+          durationRaw === ""
+            ? 0
+            : Number(durationRaw);
         const quantity = Number.isInteger(item?.quantity) ? item.quantity : 1;
         const staffId = item?.staffId || null;
         const staffName = item?.staffName?.trim() || null;
@@ -303,14 +506,19 @@ function registerIpcHandlers() {
         if (!Number.isFinite(unitPrice) || unitPrice < 0) {
           throw new Error("Invalid service price");
         }
-        if (!Number.isInteger(duration) || duration <= 0) {
+        // Duration is optional for billing; allow 0 or positive minutes
+        if (
+          !Number.isFinite(duration) ||
+          duration < 0 ||
+          !Number.isInteger(duration)
+        ) {
           throw new Error("Invalid service duration");
         }
         if (!Number.isInteger(quantity) || quantity <= 0) {
           throw new Error("Invalid quantity");
         }
         const lineTotal = unitPrice * quantity;
-        totalAmount += lineTotal;
+        subtotal += lineTotal;
         return {
           serviceId,
           serviceName,
@@ -323,11 +531,49 @@ function registerIpcHandlers() {
         };
       });
 
+      const discountAmount = manualDiscount > 0 ? manualDiscount : 0;
+      const taxableAmount = Math.max(subtotal - discountAmount, 0);
+      const gstAmount = (taxableAmount * gstRate) / 100;
+      const totalAmount = taxableAmount + gstAmount;
+
+      // Loyalty calculations (simple rule: 1 point per 100 currency units)
+      const loyaltyRate = parseNumber(getSetting("loyalty_rate"), 0); // points per currency unit
+      let loyaltyPointsEarned = 0;
+      if (loyaltyRate > 0 && customerId) {
+        loyaltyPointsEarned = Math.floor(totalAmount * loyaltyRate);
+      }
+
+      const customerRow =
+        customerId &&
+        db
+          .prepare("SELECT id, loyalty_points FROM customers WHERE id = ?")
+          .get(customerId);
+
+      const availablePoints = customerRow?.loyalty_points || 0;
+      const pointsToRedeem = Math.min(
+        loyaltyRedeemPoints > 0 ? loyaltyRedeemPoints : 0,
+        availablePoints
+      );
+      const loyaltyRedeemValue = pointsToRedeem; // 1 point == 1 currency unit
+      const netAmount = Math.max(totalAmount - loyaltyRedeemValue, 0);
+
       const billInfo = db
         .prepare(
-          "INSERT INTO bills (customer_id, customer_name, bill_date, total_amount) VALUES (?, ?, ?, ?)"
+          "INSERT INTO bills (customer_id, customer_name, bill_date, subtotal, discount_amount, gst_rate, gst_amount, total_amount, net_amount, status, loyalty_points_earned, loyalty_points_redeemed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'FINAL', ?, ?)"
         )
-        .run(customerId, customerName, billDate, totalAmount);
+        .run(
+          customerId,
+          customerName,
+          billDate,
+          subtotal,
+          discountAmount,
+          gstRate,
+          gstAmount,
+          totalAmount,
+          netAmount,
+          loyaltyPointsEarned,
+          pointsToRedeem
+        );
 
       const billId = billInfo.lastInsertRowid;
       const insertItem = db.prepare(
@@ -347,12 +593,92 @@ function registerIpcHandlers() {
         );
       }
 
+      // Record payments: support split payments; default to single cash payment
+      const effectivePayments =
+        payments.length > 0
+          ? payments
+          : [
+              {
+                mode: "Cash",
+                amount: netAmount,
+                reference: null,
+              },
+            ];
+
+      const insertPayment = db.prepare(
+        "INSERT INTO bill_payments (bill_id, mode, amount, reference) VALUES (?, ?, ?, ?)"
+      );
+      let paidTotal = 0;
+      for (const p of effectivePayments) {
+        const mode = String(p.mode || "Cash");
+        const amount = parseNumber(p.amount, 0);
+        if (!amount || amount < 0) continue;
+        insertPayment.run(billId, mode, amount, p.reference || null);
+        paidTotal += amount;
+      }
+
+      if (Math.round(paidTotal * 100) < Math.round(netAmount * 100)) {
+        throw new Error("Total payment is less than bill amount");
+      }
+
+      // Loyalty balance updates
+      if (customerId && (loyaltyPointsEarned > 0 || pointsToRedeem > 0)) {
+        const newBalance =
+          (customerRow?.loyalty_points || 0) +
+          loyaltyPointsEarned -
+          pointsToRedeem;
+        db.prepare("UPDATE customers SET loyalty_points = ? WHERE id = ?").run(
+          newBalance,
+          customerId
+        );
+
+        if (loyaltyPointsEarned > 0) {
+          db.prepare(
+            "INSERT INTO loyalty_transactions (customer_id, bill_id, type, points) VALUES (?, ?, 'EARN', ?)"
+          ).run(customerId, billId, loyaltyPointsEarned);
+        }
+        if (pointsToRedeem > 0) {
+          db.prepare(
+            "INSERT INTO loyalty_transactions (customer_id, bill_id, type, points) VALUES (?, ?, 'REDEEM', ?)"
+          ).run(customerId, billId, pointsToRedeem);
+        }
+      }
+
+      // Usage-based stock deduction for services that consume products
+      const getServiceProducts = db.prepare(
+        "SELECT product_id, quantity FROM service_products WHERE service_id = ?"
+      );
+      const updateProductQty = db.prepare(
+        "UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?"
+      );
+      const insertStockMovement = db.prepare(
+        "INSERT INTO stock_movements (product_id, movement_date, quantity, type, reason, related_service_id, related_bill_item_id) VALUES (?, ?, ?, 'OUT', 'SERVICE_USAGE', ?, ?)"
+      );
+
+      for (const billItem of normalizedItems) {
+        if (!billItem.serviceId) continue;
+        const serviceProducts = getServiceProducts.all(billItem.serviceId);
+        for (const sp of serviceProducts) {
+          const usedQty = (sp.quantity || 0) * billItem.quantity;
+          if (!usedQty) continue;
+          updateProductQty.run(usedQty, sp.product_id);
+          insertStockMovement.run(
+            sp.product_id,
+            billDate,
+            usedQty,
+            billItem.serviceId,
+            null
+          );
+        }
+      }
+
       return {
         id: billId,
         customer_id: customerId,
         customer_name: customerName,
         bill_date: billDate,
         total_amount: totalAmount,
+        net_amount: netAmount,
       };
     });
 
@@ -414,6 +740,200 @@ function registerIpcHandlers() {
       topServices: services,
       staffServiceCounts: staff,
     };
+  });
+
+  ipcMain.handle("reports:dailyCashClosing", (_event, { date }) => {
+    if (!date) {
+      throw new Error("Date is required");
+    }
+
+    const incomeByMode = db
+      .prepare(
+        "SELECT bp.mode, IFNULL(SUM(bp.amount), 0) AS total " +
+          "FROM bill_payments bp JOIN bills b ON b.id = bp.bill_id " +
+          "WHERE DATE(b.bill_date) = ? " +
+          "GROUP BY bp.mode"
+      )
+      .all(date);
+
+    const totalIncomeRow = db
+      .prepare(
+        "SELECT IFNULL(SUM(net_amount), 0) AS total FROM bills WHERE DATE(bill_date) = ?"
+      )
+      .get(date);
+
+    const expensesRow = db
+      .prepare(
+        "SELECT IFNULL(SUM(amount), 0) AS total FROM expenses WHERE date = ?"
+      )
+      .get(date);
+
+    return {
+      date,
+      incomeByMode,
+      totalIncome: totalIncomeRow.total,
+      totalExpenses: expensesRow.total,
+      netCash: totalIncomeRow.total - expensesRow.total,
+    };
+  });
+
+  // Expenses
+  ipcMain.handle("expenses:add", (_event, payload) => {
+    const date = payload?.date?.trim();
+    const category = payload?.category?.trim();
+    const amount = parseNumber(payload?.amount, NaN);
+    const description = payload?.description?.trim() || null;
+    if (!date) {
+      throw new Error("Expense date is required");
+    }
+    if (!category) {
+      throw new Error("Expense category is required");
+    }
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new Error("Expense amount is invalid");
+    }
+    const info = db
+      .prepare(
+        "INSERT INTO expenses (date, category, description, amount) VALUES (?, ?, ?, ?)"
+      )
+      .run(date, category, description, amount);
+    return db
+      .prepare("SELECT * FROM expenses WHERE id = ?")
+      .get(info.lastInsertRowid);
+  });
+
+  ipcMain.handle("expenses:listByRange", (_event, { from, to }) => {
+    if (!from || !to) {
+      throw new Error("From and to dates are required");
+    }
+    const rows = db
+      .prepare(
+        "SELECT * FROM expenses WHERE date BETWEEN ? AND ? ORDER BY date ASC, id ASC"
+      )
+      .all(from, to);
+    const totalRow = db
+      .prepare(
+        "SELECT IFNULL(SUM(amount), 0) AS total FROM expenses WHERE date BETWEEN ? AND ?"
+      )
+      .get(from, to);
+    return {
+      from,
+      to,
+      items: rows,
+      total: totalRow.total,
+    };
+  });
+
+  // Inventory / products / stock
+  ipcMain.handle("inventory:products:list", () => {
+    return db
+      .prepare("SELECT * FROM products WHERE is_active = 1 ORDER BY name ASC")
+      .all();
+  });
+
+  ipcMain.handle("inventory:products:add", (_event, payload) => {
+    const name = payload?.name?.trim();
+    if (!name) {
+      throw new Error("Product name is required");
+    }
+    const category = payload?.category?.trim() || null;
+    const supplierId = payload?.supplierId || null;
+    const sku = payload?.sku?.trim() || null;
+    const unit = payload?.unit?.trim() || null;
+    const costPrice = parseNumber(payload?.costPrice, null);
+    const salePrice = parseNumber(payload?.salePrice, null);
+    const minStock = parseNumber(payload?.minStock, 0);
+    const expiryDate = payload?.expiryDate?.trim() || null;
+
+    const info = db
+      .prepare(
+        "INSERT INTO products (name, category, supplier_id, sku, unit, cost_price, sale_price, min_stock, expiry_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      )
+      .run(
+        name,
+        category,
+        supplierId,
+        sku,
+        unit,
+        costPrice,
+        salePrice,
+        minStock,
+        expiryDate
+      );
+    return db
+      .prepare("SELECT * FROM products WHERE id = ?")
+      .get(info.lastInsertRowid);
+  });
+
+  ipcMain.handle("inventory:products:update", (_event, payload) => {
+    if (!payload || !payload.id) {
+      throw new Error("Product id is required");
+    }
+    const name = payload?.name?.trim();
+    if (!name) {
+      throw new Error("Product name is required");
+    }
+    const category = payload?.category?.trim() || null;
+    const supplierId = payload?.supplierId || null;
+    const sku = payload?.sku?.trim() || null;
+    const unit = payload?.unit?.trim() || null;
+    const costPrice = parseNumber(payload?.costPrice, null);
+    const salePrice = parseNumber(payload?.salePrice, null);
+    const minStock = parseNumber(payload?.minStock, 0);
+    const expiryDate = payload?.expiryDate?.trim() || null;
+
+    db.prepare(
+      "UPDATE products SET name = ?, category = ?, supplier_id = ?, sku = ?, unit = ?, cost_price = ?, sale_price = ?, min_stock = ?, expiry_date = ? WHERE id = ?"
+    ).run(
+      name,
+      category,
+      supplierId,
+      sku,
+      unit,
+      costPrice,
+      salePrice,
+      minStock,
+      expiryDate,
+      payload.id
+    );
+    return db.prepare("SELECT * FROM products WHERE id = ?").get(payload.id);
+  });
+
+  ipcMain.handle("inventory:products:deactivate", (_event, id) => {
+    if (!id) {
+      throw new Error("Product id is required");
+    }
+    db.prepare("UPDATE products SET is_active = 0 WHERE id = ?").run(id);
+    return true;
+  });
+
+  ipcMain.handle("inventory:stockMove", (_event, payload) => {
+    const productId = payload?.productId;
+    const quantity = parseNumber(payload?.quantity, NaN);
+    const type = payload?.type === "OUT" ? "OUT" : "IN";
+    const reason = payload?.reason?.trim() || null;
+    if (!productId) {
+      throw new Error("Product id is required");
+    }
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      throw new Error("Quantity must be positive");
+    }
+
+    const movementDate = new Date().toISOString();
+    const signedQty = type === "OUT" ? -quantity : quantity;
+
+    const tx = db.transaction(() => {
+      db.prepare(
+        "UPDATE products SET stock_quantity = stock_quantity + ? WHERE id = ?"
+      ).run(signedQty, productId);
+
+      db.prepare(
+        "INSERT INTO stock_movements (product_id, movement_date, quantity, type, reason, related_service_id, related_bill_item_id) VALUES (?, ?, ?, ?, ?, NULL, NULL)"
+      ).run(productId, movementDate, quantity, type, reason);
+    });
+
+    tx();
+    return true;
   });
 
   // Backup & restore

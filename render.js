@@ -15,6 +15,15 @@ window.addEventListener("DOMContentLoaded", () => {
   const customerForm = document.getElementById("customer-form");
   const customerName = document.getElementById("customer-name");
   const customerPhone = document.getElementById("customer-phone");
+  const customerGender = document.getElementById("customer-gender");
+  const customerDob = document.getElementById("customer-dob");
+  const customerBirthdayReminder = document.getElementById(
+    "customer-birthday-reminder"
+  );
+  const customerAnniversary = document.getElementById("customer-anniversary");
+  const customerAnniversaryReminder = document.getElementById(
+    "customer-anniversary-reminder"
+  );
   const customerClear = document.getElementById("customer-clear");
   const customerError = document.getElementById("customer-error");
   const customerSearch = document.getElementById("customer-search");
@@ -66,6 +75,23 @@ window.addEventListener("DOMContentLoaded", () => {
   const backupCreate = document.getElementById("backup-create");
   const backupError = document.getElementById("backup-error");
   const backupBody = document.getElementById("backup-body");
+
+  // Appointments
+  const appointmentForm = document.getElementById("appointment-form");
+  const appointmentStart = document.getElementById("appointment-start");
+  const appointmentCustomer = document.getElementById("appointment-customer");
+  const appointmentCustomerSuggestions = document.getElementById(
+    "appointment-customer-suggestions"
+  );
+  const appointmentServiceSelect = document.getElementById(
+    "appointment-service"
+  );
+  const appointmentStaffSelect = document.getElementById("appointment-staff");
+  const appointmentWalkin = document.getElementById("appointment-walkin");
+  const appointmentError = document.getElementById("appointment-error");
+  const appointmentDate = document.getElementById("appointment-date");
+  const appointmentsBody = document.getElementById("appointments-body");
+  let selectedAppointmentCustomerId = null;
 
   function setLockError(message) {
     lockError.textContent = message || "";
@@ -157,6 +183,8 @@ window.addEventListener("DOMContentLoaded", () => {
         nameTd.textContent = c.name;
         const phoneTd = document.createElement("td");
         phoneTd.textContent = c.phone || "";
+        const loyaltyTd = document.createElement("td");
+        loyaltyTd.textContent = c.loyalty_points ?? 0;
         const createdTd = document.createElement("td");
         createdTd.textContent = c.created_at || "";
         const actionsTd = document.createElement("td");
@@ -166,6 +194,12 @@ window.addEventListener("DOMContentLoaded", () => {
           editingCustomerId = c.id;
           customerName.value = c.name;
           customerPhone.value = c.phone || "";
+          customerGender.value = c.gender || "";
+          customerDob.value = c.date_of_birth || "";
+          customerBirthdayReminder.checked = !!c.birthday_reminder_enabled;
+          customerAnniversary.value = c.anniversary_date || "";
+          customerAnniversaryReminder.checked =
+            !!c.anniversary_reminder_enabled;
         });
         const delBtn = document.createElement("button");
         delBtn.textContent = "Delete";
@@ -184,6 +218,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
         tr.appendChild(nameTd);
         tr.appendChild(phoneTd);
+        tr.appendChild(loyaltyTd);
         tr.appendChild(createdTd);
         tr.appendChild(actionsTd);
         customersBody.appendChild(tr);
@@ -203,19 +238,42 @@ window.addEventListener("DOMContentLoaded", () => {
       setCustomerError("Customer name is required");
       return;
     }
+    const gender = customerGender.value || null;
+    const date_of_birth = customerDob.value || null;
+    const birthday_reminder_enabled = customerBirthdayReminder.checked;
+    const anniversary_date = customerAnniversary.value || null;
+    const anniversary_reminder_enabled = customerAnniversaryReminder.checked;
     try {
       if (editingCustomerId) {
         await window.api.customers.update({
           id: editingCustomerId,
           name,
           phone,
+          gender,
+          date_of_birth,
+          birthday_reminder_enabled,
+          anniversary_date,
+          anniversary_reminder_enabled,
         });
       } else {
-        await window.api.customers.add({ name, phone });
+        await window.api.customers.add({
+          name,
+          phone,
+          gender,
+          date_of_birth,
+          birthday_reminder_enabled,
+          anniversary_date,
+          anniversary_reminder_enabled,
+        });
       }
       editingCustomerId = null;
       customerName.value = "";
       customerPhone.value = "";
+      customerGender.value = "";
+      customerDob.value = "";
+      customerBirthdayReminder.checked = false;
+      customerAnniversary.value = "";
+      customerAnniversaryReminder.checked = false;
       await refreshCustomers();
       updateBillingSelectors();
     } catch (error) {
@@ -228,6 +286,11 @@ window.addEventListener("DOMContentLoaded", () => {
     editingCustomerId = null;
     customerName.value = "";
     customerPhone.value = "";
+    customerGender.value = "";
+    customerDob.value = "";
+    customerBirthdayReminder.checked = false;
+    customerAnniversary.value = "";
+    customerAnniversaryReminder.checked = false;
     setCustomerError("");
   });
 
@@ -245,9 +308,9 @@ window.addEventListener("DOMContentLoaded", () => {
     try {
       setServiceError("");
       const services = await window.api.services.list();
+      const activeServices = services.filter((s) => s.is_active);
       servicesBody.innerHTML = "";
       billingServiceSelect.innerHTML = "";
-      const activeServices = services.filter((s) => s.is_active);
       activeServices.forEach((s) => {
         const opt = document.createElement("option");
         opt.value = String(s.id);
@@ -257,7 +320,7 @@ window.addEventListener("DOMContentLoaded", () => {
         billingServiceSelect.appendChild(opt);
       });
 
-      services.forEach((s) => {
+      activeServices.forEach((s) => {
         const tr = document.createElement("tr");
         const nameTd = document.createElement("td");
         nameTd.textContent = s.name;
@@ -360,9 +423,9 @@ window.addEventListener("DOMContentLoaded", () => {
     try {
       setStaffError("");
       const staff = await window.api.staff.list();
+      const activeStaff = staff.filter((s) => s.is_active);
       staffBody.innerHTML = "";
       billingStaffSelect.innerHTML = "";
-      const activeStaff = staff.filter((s) => s.is_active);
       activeStaff.forEach((s) => {
         const opt = document.createElement("option");
         opt.value = String(s.id);
@@ -370,7 +433,7 @@ window.addEventListener("DOMContentLoaded", () => {
         billingStaffSelect.appendChild(opt);
       });
 
-      staff.forEach((s) => {
+      activeStaff.forEach((s) => {
         const tr = document.createElement("tr");
         const nameTd = document.createElement("td");
         nameTd.textContent = s.name;
@@ -540,6 +603,13 @@ window.addEventListener("DOMContentLoaded", () => {
 
   function updateBillingSelectors() {
     // services and staff are updated in their respective refresh functions
+    // Also keep appointment selectors in sync
+    if (billingServiceSelect && appointmentServiceSelect) {
+      appointmentServiceSelect.innerHTML = billingServiceSelect.innerHTML;
+    }
+    if (billingStaffSelect && appointmentStaffSelect) {
+      appointmentStaffSelect.innerHTML = billingStaffSelect.innerHTML;
+    }
   }
 
   billingAddItem.addEventListener("click", () => {
@@ -597,6 +667,163 @@ window.addEventListener("DOMContentLoaded", () => {
       window.alert("Bill saved");
     } catch (error) {
       setBillingError("Failed to save bill");
+      console.error(error);
+    }
+  });
+
+  // Appointments
+  function setAppointmentError(message) {
+    appointmentError.textContent = message || "";
+    appointmentError.style.display = message ? "block" : "none";
+  }
+
+  function clearAppointmentCustomerSelection() {
+    selectedAppointmentCustomerId = null;
+  }
+
+  function hideAppointmentCustomerSuggestions() {
+    appointmentCustomerSuggestions.style.display = "none";
+    appointmentCustomerSuggestions.innerHTML = "";
+  }
+
+  function renderAppointmentCustomerSuggestions(customers) {
+    if (!customers.length) {
+      hideAppointmentCustomerSuggestions();
+      return;
+    }
+    appointmentCustomerSuggestions.innerHTML = "";
+    customers.slice(0, 8).forEach((c) => {
+      const div = document.createElement("div");
+      div.className = "suggestion-item";
+      const phoneText = c.phone ? ` (${c.phone})` : "";
+      div.textContent = `${c.name}${phoneText}`;
+      div.addEventListener("click", () => {
+        appointmentCustomer.value = `${c.name}${phoneText}`;
+        selectedAppointmentCustomerId = c.id;
+        hideAppointmentCustomerSuggestions();
+      });
+      appointmentCustomerSuggestions.appendChild(div);
+    });
+    appointmentCustomerSuggestions.style.display = "block";
+  }
+
+  appointmentCustomer.addEventListener("input", async () => {
+    setAppointmentError("");
+    clearAppointmentCustomerSelection();
+    const term = appointmentCustomer.value.trim();
+    if (!term) {
+      hideAppointmentCustomerSuggestions();
+      return;
+    }
+    try {
+      const customers = await window.api.customers.list({ search: term });
+      renderAppointmentCustomerSuggestions(customers);
+    } catch (error) {
+      console.error(error);
+      hideAppointmentCustomerSuggestions();
+    }
+  });
+
+  async function loadAppointmentsForDate(dateStr) {
+    if (!dateStr) return;
+    try {
+      setAppointmentError("");
+      const appts = await window.api.appointments.listByRange(
+        dateStr,
+        dateStr,
+        null
+      );
+      appointmentsBody.innerHTML = "";
+      appts.forEach((a) => {
+        const tr = document.createElement("tr");
+        const timeTd = document.createElement("td");
+        const start = new Date(a.start_time);
+        timeTd.textContent = start.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        const customerTd = document.createElement("td");
+        customerTd.textContent = a.customer_name;
+        const serviceTd = document.createElement("td");
+        serviceTd.textContent = ""; // simplified; could join services if needed
+        const staffTd = document.createElement("td");
+        staffTd.textContent = "";
+        const statusTd = document.createElement("td");
+        statusTd.textContent = a.status;
+
+        tr.appendChild(timeTd);
+        tr.appendChild(customerTd);
+        tr.appendChild(serviceTd);
+        tr.appendChild(staffTd);
+        tr.appendChild(statusTd);
+        appointmentsBody.appendChild(tr);
+      });
+    } catch (error) {
+      setAppointmentError("Failed to load appointments");
+      console.error(error);
+    }
+  }
+
+  appointmentDate.addEventListener("change", () => {
+    loadAppointmentsForDate(appointmentDate.value);
+  });
+
+  appointmentForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    setAppointmentError("");
+    const startValue = appointmentStart.value;
+    const customerName = appointmentCustomer.value.trim();
+    const serviceOption = appointmentServiceSelect.selectedOptions[0];
+    const staffOption = appointmentStaffSelect.selectedOptions[0] || null;
+    if (!startValue) {
+      setAppointmentError("Start date/time is required");
+      return;
+    }
+    if (!customerName) {
+      setAppointmentError("Customer is required");
+      return;
+    }
+    if (!serviceOption) {
+      setAppointmentError("Service is required");
+      return;
+    }
+    try {
+      const serviceId = Number(serviceOption.value);
+      const serviceName = serviceOption.textContent || "Service";
+      const duration = Number(serviceOption.dataset.duration || "0");
+      const price = Number(serviceOption.dataset.price || "0");
+      const staffId = staffOption ? Number(staffOption.value) : null;
+      const staffName = staffOption ? staffOption.textContent : null;
+
+      await window.api.appointments.create({
+        customerId: selectedAppointmentCustomerId,
+        customerName,
+        isWalkIn: appointmentWalkin.checked,
+        startTime: new Date(startValue).toISOString(),
+        items: [
+          {
+            serviceId,
+            serviceName,
+            duration_minutes: duration,
+            staffId,
+            staffName,
+            price,
+          },
+        ],
+      });
+
+      appointmentCustomer.value = "";
+      clearAppointmentCustomerSelection();
+      hideAppointmentCustomerSuggestions();
+      appointmentWalkin.checked = false;
+
+      const selectedDate = appointmentDate.value || startValue.slice(0, 10);
+      if (!appointmentDate.value) {
+        appointmentDate.value = selectedDate;
+      }
+      loadAppointmentsForDate(selectedDate);
+    } catch (error) {
+      setAppointmentError("Failed to book appointment");
       console.error(error);
     }
   });
@@ -692,5 +919,9 @@ window.addEventListener("DOMContentLoaded", () => {
   // Initialize
   const today = new Date().toISOString().slice(0, 10);
   reportDate.value = today;
+  if (appointmentDate) {
+    appointmentDate.value = today;
+    loadAppointmentsForDate(today);
+  }
   initLockScreen();
 });

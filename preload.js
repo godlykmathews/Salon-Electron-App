@@ -57,6 +57,21 @@ const api = {
       return ipcRenderer.invoke("staff:delete", id);
     },
   },
+  appointments: {
+    create(data) {
+      return ipcRenderer.invoke("appointments:create", data);
+    },
+    listByRange(from, to, staffId) {
+      return ipcRenderer.invoke("appointments:listByRange", {
+        from,
+        to,
+        staffId,
+      });
+    },
+    updateStatus(data) {
+      return ipcRenderer.invoke("appointments:updateStatus", data);
+    },
+  },
   billing: {
     createBill(data) {
       return ipcRenderer.invoke("billing:createBill", data);
@@ -68,6 +83,34 @@ const api = {
   reports: {
     dailySummary(date) {
       return ipcRenderer.invoke("reports:dailySummary", { date });
+    },
+    dailyCashClosing(date) {
+      return ipcRenderer.invoke("reports:dailyCashClosing", { date });
+    },
+  },
+  expenses: {
+    add(data) {
+      return ipcRenderer.invoke("expenses:add", data);
+    },
+    listByRange(from, to) {
+      return ipcRenderer.invoke("expenses:listByRange", { from, to });
+    },
+  },
+  inventory: {
+    listProducts() {
+      return ipcRenderer.invoke("inventory:products:list");
+    },
+    addProduct(data) {
+      return ipcRenderer.invoke("inventory:products:add", data);
+    },
+    updateProduct(data) {
+      return ipcRenderer.invoke("inventory:products:update", data);
+    },
+    deactivateProduct(id) {
+      return ipcRenderer.invoke("inventory:products:deactivate", id);
+    },
+    stockMove(data) {
+      return ipcRenderer.invoke("inventory:stockMove", data);
     },
   },
   backup: {
