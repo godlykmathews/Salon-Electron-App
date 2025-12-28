@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Salon Manager</title>
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        background-color: #f5f5f7;
+        color: #222;
+      }
+
+      header {
+        background-color: #1f2933;
+        color: #fff;
+        padding: 16px 24px;
+      }
+
+      header h1 {
+        margin: 0;
+        font-size: 20px;
+      }
+
+      main {
+        padding: 16px 24px 24px;
+        max-width: 960px;
+        margin: 0 auto;
+      }
+
+      .card {
+        background-color: #fff;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1);
+        padding: 16px 20px;
+        margin-bottom: 20px;
+      }
+
+      .card h2 {
+        margin-top: 0;
+        font-size: 18px;
+        margin-bottom: 12px;
+      }
+
+      form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: flex-end;
+      }
+
+      label {
+        display: flex;
+        flex-direction: column;
+        font-size: 13px;
+        color: #4b5563;
+      }
+
+      input[type="text"],
+      input[type="tel"] {
+        margin-top: 4px;
+        padding: 6px 8px;
+        border-radius: 4px;
+        border: 1px solid #d1d5db;
+        min-width: 220px;
+        font-size: 14px;
+      }
+
+      button[type="submit"] {
+        padding: 8px 16px;
+        border-radius: 4px;
+        border: none;
+        background-color: #2563eb;
+        color: #fff;
+        font-size: 14px;
+        cursor: pointer;
+      }
+
+      button[type="submit"]:hover {
+        background-color: #1d4ed8;
+      }
+
+      .error {
+        display: none;
+        margin-top: 8px;
+        padding: 8px 10px;
+        border-radius: 4px;
+        background-color: #fee2e2;
+        color: #b91c1c;
+        font-size: 13px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+      }
+
+      th,
+      td {
+        padding: 8px 10px;
+        border-bottom: 1px solid #e5e7eb;
+        text-align: left;
+      }
+
+      th {
+        background-color: #f3f4f6;
+        font-weight: 600;
+        font-size: 13px;
+      }
+
+      tbody tr:nth-child(even) {
+        background-color: #f9fafb;
+      }
+
+      .suggestions {
+        margin-top: 4px;
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+        background-color: #ffffff;
+        max-height: 160px;
+        overflow-y: auto;
+        font-size: 13px;
+      }
+
+      .suggestion-item {
+        padding: 6px 8px;
+        cursor: pointer;
+      }
+
+      .suggestion-item:hover {
+        background-color: #e5e7eb;
+      }
+    </style>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Salon Manager</h1>
+    </header>
+
+    <main>
+      <div
+        id="lock-screen"
+        class="card"
+        style="max-width: 480px; margin: 32px auto"
+      >
+        <h2 id="lock-title">Enter Admin PIN</h2>
+        <form id="lock-form">
+          <label>
+            PIN
+            <input type="password" id="lock-pin" autocomplete="off" />
+          </label>
+          <label id="lock-new-pin-row" style="display: none">
+            New PIN
+            <input type="password" id="lock-new-pin" autocomplete="off" />
+          </label>
+          <button type="submit">Continue</button>
+        </form>
+        <div id="lock-error" class="error"></div>
+      </div>
+
+      <div id="app-shell" style="display: none">
+        <nav class="card" style="margin-bottom: 16px">
+          <button class="tab-button" data-tab="customers">Customers</button>
+          <button class="tab-button" data-tab="services">Services</button>
+          <button class="tab-button" data-tab="billing">Billing</button>
+          <button class="tab-button" data-tab="reports">Reports</button>
+          <button class="tab-button" data-tab="staff">Staff</button>
+          <button class="tab-button" data-tab="backup">Backup</button>
+        </nav>
+
+        <section id="tab-customers" class="card tab-panel">
+          <h2>Customers</h2>
+          <form id="customer-form">
+            <label>
+              Name
+              <input type="text" id="customer-name" autocomplete="off" />
+            </label>
+            <label>
+              Phone
+              <input type="tel" id="customer-phone" autocomplete="off" />
+            </label>
+            <button type="submit">Save</button>
+            <button type="button" id="customer-clear">Clear</button>
+          </form>
+          <div id="customer-error" class="error"></div>
+          <label style="margin-top: 12px; display: block">
+            Search
+            <input
+              type="text"
+              id="customer-search"
+              placeholder="Name or phone"
+            />
+          </label>
+          <table style="margin-top: 12px">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Phone</th>
+                <th>Created</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="customers-body"></tbody>
+          </table>
+        </section>
+
+        <section id="tab-services" class="card tab-panel" style="display: none">
+          <h2>Services</h2>
+          <form id="service-form">
+            <label>
+              Name
+              <input type="text" id="service-name" />
+            </label>
+            <label>
+              Price
+              <input type="number" step="0.01" id="service-price" />
+            </label>
+            <label>
+              Duration (minutes)
+              <input type="number" id="service-duration" />
+            </label>
+            <button type="submit">Save</button>
+            <button type="button" id="service-clear">Clear</button>
+          </form>
+          <div id="service-error" class="error"></div>
+          <table style="margin-top: 12px">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Price</th>
+                <th>Duration</th>
+                <th>Active</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="services-body"></tbody>
+          </table>
+        </section>
+
+        <section id="tab-staff" class="card tab-panel" style="display: none">
+          <h2>Staff</h2>
+          <form id="staff-form">
+            <label>
+              Name
+              <input type="text" id="staff-name" />
+            </label>
+            <label>
+              Role
+              <input type="text" id="staff-role" />
+            </label>
+            <button type="submit">Save</button>
+            <button type="button" id="staff-clear">Clear</button>
+          </form>
+          <div id="staff-error" class="error"></div>
+          <table style="margin-top: 12px">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Role</th>
+                <th>Active</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="staff-body"></tbody>
+          </table>
+        </section>
+
+        <section id="tab-billing" class="card tab-panel" style="display: none">
+          <h2>Billing</h2>
+          <form id="billing-form">
+            <label>
+              Customer
+              <input
+                type="text"
+                id="billing-customer"
+                placeholder="Search customers"
+              />
+              <div
+                id="billing-customer-suggestions"
+                class="suggestions"
+                style="display: none"
+              ></div>
+            </label>
+            <label>
+              Select Service
+              <select id="billing-service"></select>
+            </label>
+            <label>
+              Staff
+              <select id="billing-staff"></select>
+            </label>
+            <label>
+              Quantity
+              <input type="number" id="billing-qty" value="1" min="1" />
+            </label>
+            <button type="button" id="billing-add-item">Add Item</button>
+          </form>
+          <div id="billing-error" class="error"></div>
+          <table style="margin-top: 12px">
+            <thead>
+              <tr>
+                <th>Service</th>
+                <th>Staff</th>
+                <th>Price</th>
+                <th>Qty</th>
+                <th>Total</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="billing-items-body"></tbody>
+          </table>
+          <div style="margin-top: 12px; font-weight: 600">
+            Total: <span id="billing-total">0.00</span>
+          </div>
+          <button type="button" id="billing-save" style="margin-top: 8px">
+            Save Bill
+          </button>
+        </section>
+
+        <section id="tab-reports" class="card tab-panel" style="display: none">
+          <h2>Daily Summary</h2>
+          <label>
+            Date
+            <input type="date" id="report-date" />
+          </label>
+          <button type="button" id="report-load" style="margin-left: 8px">
+            Load
+          </button>
+          <div id="report-error" class="error"></div>
+          <div id="report-output" style="margin-top: 12px"></div>
+        </section>
+
+        <section id="tab-backup" class="card tab-panel" style="display: none">
+          <h2>Backup &amp; Restore</h2>
+          <button type="button" id="backup-create">Create Backup</button>
+          <div id="backup-error" class="error"></div>
+          <table style="margin-top: 12px">
+            <thead>
+              <tr>
+                <th>Backup File</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="backup-body"></tbody>
+          </table>
+          <p style="margin-top: 8px; font-size: 12px; color: #4b5563">
+            Restoring a backup will restart the application.
+          </p>
+        </section>
+      </div>
+    </main>
+
+    <script src="render.js"></script>
+  </body>
+</html>
